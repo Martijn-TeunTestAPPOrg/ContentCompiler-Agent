@@ -336,21 +336,29 @@ export async function updateRemote(app: Probot, context: Context<any>, branch: s
 
             const fileBuffer = await fs.readFileSync(file);
 
+            // Detect if the file is binary
+            const isBinary = fileBuffer.includes(0); // A binary file typically contains NULL bytes (0)
+
+            // If it's a text file, normalize line endings
+            let normalizedBuffer = fileBuffer;
+            if (!isBinary) {
+                const fileContentLF = fileBuffer.toString('utf-8').replace(/\r\n/g, '\n');
+                normalizedBuffer = Buffer.from(fileContentLF, 'utf-8');
+            }
+
             // Compute hash with original content
             const originalBlobHash = createHash('sha1')
                 .update(`blob ${fileBuffer.length}\0`)
                 .update(fileBuffer)
                 .digest('hex');
 
-            // Normalize line endings to LF (\n)
-            const fileContentLF = fileBuffer.toString('utf-8').replace(/\r\n/g, '\n');
-            const normalizedBuffer = Buffer.from(fileContentLF, 'utf-8');
-
-            // Compute hash with LF-normalized content
-            const normalizedBlobHash = createHash('sha1')
-                .update(`blob ${normalizedBuffer.length}\0`)
-                .update(normalizedBuffer)
-                .digest('hex');
+            // Compute hash with LF-normalized content (only for text files)
+            const normalizedBlobHash = isBinary
+                ? originalBlobHash  // Binary files don't need a second hash
+                : createHash('sha1')
+                    .update(`blob ${normalizedBuffer.length}\0`)
+                    .update(normalizedBuffer)
+                    .digest('hex');
 
             // Compare against Git’s stored hash
             const existingHash = existingFiles.get(relativePath);
@@ -363,43 +371,39 @@ export async function updateRemote(app: Probot, context: Context<any>, branch: s
                     type: 'blob' as "blob",
                     sha: existingFiles.get(relativePath),
                 });
-                // Remove from existing files map to track deletions
                 existingFiles.delete(relativePath);
                 continue;
             } else {
                 console.log('File has changed or is new; create a new blob:');
-
-                const logItem = {
-                    "File path: ": relativePath,
-                    "originalBlobHash" : originalBlobHash,
-                    "normalizedBlobHash" : normalizedBlobHash,
-                    "existing hash" : existingHash
-                };
-
-                console.log(logItem);
+                console.log({
+                    "File path": relativePath,
+                    "originalBlobHash": originalBlobHash,
+                    "normalizedBlobHash": normalizedBlobHash,
+                    "existing hash": existingHash,
+                });
             }
 
-            // File has changed or is new; create a new blob
-            const isBinary = normalizedBuffer.includes(0);
+            // Handle encoding for GitHub API
             const content = isBinary
-                ? normalizedBuffer.toString('base64')
-                : normalizedBuffer.toString('utf-8');
+                ? fileBuffer.toString('base64')  // Keep binary files in base64
+                : normalizedBuffer.toString('utf-8');  // Use UTF-8 for text files
             const encoding = isBinary ? 'base64' : 'utf-8';
-    
+
+            // Create new blob in GitHub
             const { data: blobData } = await octokit.rest.git.createBlob({
                 owner: repoOwner,
                 repo: repoName,
                 content,
                 encoding,
             });
-  
+
             treeEntries.push({
-            path: relativePath,
-            mode: '100644' as "100644",
-            type: 'blob' as "blob",
-            sha: blobData.sha,
+                path: relativePath,
+                mode: '100644' as "100644",
+                type: 'blob' as "blob",
+                sha: blobData.sha,
             });
-  
+
             // Remove from existing files map to track deletions
             existingFiles.delete(relativePath);
         }
@@ -407,7 +411,14 @@ export async function updateRemote(app: Probot, context: Context<any>, branch: s
         // Step 5: Handle deletions: remaining files in existingFiles are deleted locally
         for (const [filePath, sha] of existingFiles) {
             // Exclude these files from the new tree to delete them
-            app.log.info(`File marked for tree removal since it hasn't changed deletion: ${filePath}`);
+            app.log.info(`File marked for tree removal since it hasn't changed: ${filePath}`);
+
+            treeEntries.push({
+                path: filePath,
+                mode: '100644' as "100644",
+                type: 'blob' as "blob",
+                sha: null, // This tells GitHub to delete the file
+            });
         }
     
         if (treeEntries.length === 0) {
