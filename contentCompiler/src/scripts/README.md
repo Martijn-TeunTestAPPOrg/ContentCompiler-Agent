@@ -47,8 +47,8 @@ python compileContent.py --skip-link-check  # Skip dynamic link validation
 Key configuration settings in `config.py`:
 
 ```python
-SRC_DIR = "src/cloned_repo/content"          # Source content directory
-DEST_DIR = "src/cloned_repo/build"           # Build output directory
+SRC_DIR = "src/content_repo/content"          # Source content directory
+DEST_DIR = "src/content_repo/build"           # Build output directory
 DATASET = "src/dataset.xlsx"                 # Taxonomy dataset file
 TAXCO_REPORT_PATH = "taxco_report.md"        # Taxonomy report output
 CONTENT_REPORT_PATH = "content_report.md"    # Content report output
@@ -148,11 +148,11 @@ python compileContent.py --skip-link-check
 ##  `config.py`
 This is the config file which stores the different config options.
 It's also used to save the state of the reports.
-- Source Directory: src/cloned_repo/content
-- Destination Directory: src/cloned_repo/build
+- Source Directory: src/content_repo/content
+- Destination Directory: src/content_repo/build
 - Dataset File: src/datasets/dataset.xlsx
-- Taxonomy Report Path: src/cloned_repo/taxco_report.md
-- Content Report Path: src/cloned_repo/content_report.md
+- Taxonomy Report Path: src/content_repo/taxco_report.md
+- Content Report Path: src/content_repo/content_report.md
 
 ## Report structure
 The script produces two md reports.

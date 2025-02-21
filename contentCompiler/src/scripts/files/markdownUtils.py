@@ -1,6 +1,6 @@
 import re, logging
 from config import dataset, contentReport
-from config import PROCES_COL, PROCESSTAP_COL, TC3_COL, TC2_COL, TAXONOMIE_PATTERN, TODO_PATTERN, ERROR_INVALID_TAXCO, ERROR_NO_TAXCO_FOUND, ERROR_TAXCO_NOT_FOUND, ERROR_TAXCO_NOT_NEEDED
+from config import PROCES_COL, PROCESSTAP_COL, TC1_COL, TC2_COL, TC3_COL, TAXONOMIE_PATTERN, TODO_PATTERN, ERROR_INVALID_TAXCO, ERROR_NO_TAXCO_FOUND, ERROR_TAXCO_NOT_FOUND, ERROR_TAXCO_NOT_NEEDED
 from report.generateTaxcoReport import updateProcessReportData, updateSubjectReportData
 
 
@@ -25,18 +25,19 @@ def generateTags(taxonomies, existingTags, filePath):
                 logging.warning(f"{ERROR_INVALID_TAXCO} `{taxonomie}` in bestand: {filePath}")
                 continue
 
-            # split the taxonomie in it's different parts
-            tc1, tc2, tc3, tc4 = splitTaxonomie(taxonomie)
-            # if the parts are all valid
-            if tc1 and tc2 and tc3 and tc4:
+            # Split the taxonomie in it's different parts
+            extractedTC1, extractedTC2, extractedTC3, extractedTC4 = splitTaxonomie(taxonomie)
+            
+            # If the parts are all valid
+            if extractedTC1 and extractedTC2 and extractedTC3 and extractedTC4:
                 # Loop trough every row in the dataset
                 for row in dataset[1:]:
-                    # Check if the first part of the taxonomie is equal to the second column (TC1) in the dataset
-                    if row[1] == tc1:
-                        # Check if the second part of the taxonomie is equal to the third column (TC2) in the dataset
-                        if row[5] in contentReport and row[5] == tc3:
+                    # Check if the first part of the taxonomie is equal to the TC1 column
+                    if row[TC1_COL] == extractedTC1:                        
+                        # Check if the second part of the taxonomie is equal to the TC2 column
+                        if row[TC3_COL] in contentReport and row[TC3_COL] == extractedTC3:
                             # Adds the taxonomie
-                            newTag = "HBO-i/niveau-" + tc2
+                            newTag = "HBO-i/niveau-" + extractedTC2
                             if newTag not in tags:
                                 tags.append(newTag)
     
@@ -54,7 +55,7 @@ def generateTags(taxonomies, existingTags, filePath):
 
                             # Check if the taxonomie is not needed
                             splittedRow =  row[TC2_COL].split(',')
-                            if splittedRow[int(tc2)-1] == "X": 
+                            if splittedRow[int(extractedTC2)-1] == "X": 
                                 errors.append(f"{ERROR_TAXCO_NOT_NEEDED} `{taxonomie}`")
                                 logging.warning(f"{ERROR_TAXCO_NOT_NEEDED} `{taxonomie}` in bestand: {filePath}")
 
@@ -63,8 +64,8 @@ def generateTags(taxonomies, existingTags, filePath):
                             # Before the script runs it pre-fills the report with all the taxonomies
                             # This is done so the report has all the taxonomies even if they are not used
                             # After this the report is updated with the correct data
-                            updateProcessReportData(tc1, tc2)
-                            updateSubjectReportData(tc1, tc2, tc3, tc4)
+                            updateProcessReportData(extractedTC1, extractedTC2)
+                            updateSubjectReportData(extractedTC1, extractedTC2, extractedTC3, extractedTC4)
 
             # If no tags were found, add an error
             if tags == [] and not errors:

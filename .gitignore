@@ -24,7 +24,9 @@ dist-ssr
 *.sln
 *.sw?
 **/DS_Store
-**/cloned_repo
+**/content_repo
 **/__pycache__
 /contentCompiler/src/temp_storage
 **/.obsidian
+/contentCompiler/src/dataset
+/contentCompiler/src/storage
