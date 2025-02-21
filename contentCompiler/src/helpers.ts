@@ -1,11 +1,10 @@
 import path from "path";
 import * as fs from "fs";
+import { createHash } from "crypto";
 import { exec } from "child_process";
 import { Probot, Context } from "probot";
 import { SimpleGit, simpleGit } from "simple-git";
 
-const gitAppName: string = process.env.GITHUB_APP_NAME || '';
-const gitAppEmail: string = process.env.GITHUB_APP_EMAIL || '';
 
 // Helper function to check if the commit is from our app
 export function isAppCommit(context: Context<'push'>) {
@@ -42,7 +41,7 @@ export async function resetGit(git: SimpleGit) {
 }
 
 // Helper function to get the installation token
-export async function getInstallationToken(app: Probot, context: Context<any>) {
+export async function getInstallationId(app: Probot, context: Context<any>) {
     const octokit = await app.auth();
     const installationId = context.payload.installation?.id;
     if (!installationId) {
@@ -125,11 +124,8 @@ export function deleteFolderRecursive(app: Probot, folderPath: string) {
 // Helper function to clone a repo
 export async function cloneRepo(app: Probot, git: SimpleGit, repo: string, targetDirectory: string) {
     try {
-        // Log the PATH environment variable
-        app.log.info(`Current PATH: ${process.env.PATH}`);
-
-        // Ensure git is available in the PATH
-        // @ts-ignore
+        // Find the git executable debug only
+        //@ts-ignore
         const whichGit = exec('where git', (error, stdout, stderr) => {
             if (error) {
                 app.log.error(`Error finding git: ${stderr}`);
@@ -186,12 +182,12 @@ export async function compileContent(app: Probot, compileCommand: string) {
             if (code === 0) {
                 app.log.info('Python script output:');
 
-                if(stdoutData) {
-                    app.log.info(stdoutData);
-                }
-                if(stderrData) {
-                    app.log.info(stderrData);
-                }
+                // if(stdoutData) {
+                //     app.log.info(stdoutData);
+                // }
+                // if(stderrData) {
+                //     app.log.info(stderrData);
+                // }
 
                 app.log.info(`Content compilation process completed`);
                 resolve();
@@ -234,7 +230,7 @@ export async function copySpecificFiles(app: Probot, files: string[], srcDir: st
     }
 }
 
-// Helper function to copy a folder recursively
+//Helper function to copy a folder recursively
 export async function copyFolder(app: Probot, srcDir: string, destDir: string) {
     try {
         // Ensure destination directory exists
@@ -259,24 +255,192 @@ export async function copyFolder(app: Probot, srcDir: string, destDir: string) {
     }
 }
 
+export function listFiles(dirPath: string): string[] {
+    let fileList: string[] = [];
+
+    function readDirectory(directory: string) {
+        const files = fs.readdirSync(directory);
+
+        files.forEach((file) => {
+            const fullPath = path.join(directory, file);
+
+			if (fullPath.includes('.git')) {
+				return;
+			}
+
+            if (fs.statSync(fullPath).isDirectory()) {
+                readDirectory(fullPath);
+            } else {
+                fileList.push(fullPath);
+            }
+        });
+    }
+
+    readDirectory(dirPath);
+    return fileList;
+}
+
 // Helper function to commit and push changes
-export async function updateRemote(app: Probot, git: SimpleGit, branch: string, items: string[], message: string) {
+//@ts-ignore
+export async function updateRemote(app: Probot, context: Context<any>, branch: string, items: string[], message: string) {
     try {
         app.log.info(`Committing and pushing changes to the ${branch} branch...`);
-
-        await git.add(items);
-        const status = await git.status();
-
-        if (!status.isClean()) {
-            await git.commit(message, undefined, {
-                '--author': `${gitAppName} <${gitAppEmail}>`,
-                '--no-verify': null
-            });
-            await git.push('origin', branch);
-            app.log.info('Changes committed and pushed successfully');
-        } else {
-            app.log.error(`No changes to commit to the ${branch} branch`);
+    
+        const { repoOwner, repoName } = getPayloadInfo(context);
+        const installationId = context.payload.installation?.id;
+        if (!installationId) {
+            throw new Error('No installation ID found');
         }
+  
+        const octokit = await app.auth(installationId);
+    
+        // Step 1: Get the latest commit SHA of the branch
+        const { data: refData } = await octokit.rest.git.getRef({
+            owner: repoOwner,
+            repo: repoName,
+            ref: `heads/${branch}`,
+        });
+        const latestCommitSha = refData.object.sha;
+  
+        // Step 2: Get the tree associated with the latest commit
+        const { data: commitData } = await octokit.rest.git.getCommit({
+            owner: repoOwner,
+            repo: repoName,
+            commit_sha: latestCommitSha,
+        });
+        const baseTreeSha = commitData.tree.sha;
+  
+        // Step 3: Get the current tree structure
+        const { data: baseTreeData } = await octokit.rest.git.getTree({
+            owner: repoOwner,
+            repo: repoName,
+            tree_sha: baseTreeSha,
+            recursive: 'true',
+        });
+    
+        // Map existing files in the repository
+        const existingFiles = new Map(
+            baseTreeData.tree.map((item) => [item.path, item.sha])
+        );
+  
+        const baseDir = path.normalize(
+            process.env.CLONE_REPO_FOLDER || 'src/storage/content_repo'
+        );
+    
+        // Track files to be included in the new tree
+        const treeEntries = [];
+  
+        // Step 4: Process each local file
+        for (const file of items) {
+            const relativePath = path.relative(baseDir, file).replace(/\\/g, '/');
+
+            const fileBuffer = await fs.readFileSync(file);
+
+            // Compute hash with original content
+            const originalBlobHash = createHash('sha1')
+                .update(`blob ${fileBuffer.length}\0`)
+                .update(fileBuffer)
+                .digest('hex');
+
+            // Normalize line endings to LF (\n)
+            const fileContentLF = fileBuffer.toString('utf-8').replace(/\r\n/g, '\n');
+            const normalizedBuffer = Buffer.from(fileContentLF, 'utf-8');
+
+            // Compute hash with LF-normalized content
+            const normalizedBlobHash = createHash('sha1')
+                .update(`blob ${normalizedBuffer.length}\0`)
+                .update(normalizedBuffer)
+                .digest('hex');
+
+            // Compare against Git’s stored hash
+            const existingHash = existingFiles.get(relativePath);
+
+            if (existingHash === originalBlobHash || existingHash === normalizedBlobHash) {
+                // File hasn't changed; retain the existing reference
+                treeEntries.push({
+                    path: relativePath,
+                    mode: '100644' as "100644",
+                    type: 'blob' as "blob",
+                    sha: existingFiles.get(relativePath),
+                });
+                // Remove from existing files map to track deletions
+                existingFiles.delete(relativePath);
+                continue;
+            } else {
+                console.log('File has changed or is new; create a new blob:');
+
+                const logItem = {
+                    "File path: ": relativePath,
+                    "originalBlobHash" : originalBlobHash,
+                    "normalizedBlobHash" : normalizedBlobHash,
+                    "existing hash" : existingHash
+                };
+
+                console.log(logItem);
+            }
+
+            // File has changed or is new; create a new blob
+            const isBinary = normalizedBuffer.includes(0);
+            const content = isBinary
+                ? normalizedBuffer.toString('base64')
+                : normalizedBuffer.toString('utf-8');
+            const encoding = isBinary ? 'base64' : 'utf-8';
+    
+            const { data: blobData } = await octokit.rest.git.createBlob({
+                owner: repoOwner,
+                repo: repoName,
+                content,
+                encoding,
+            });
+  
+            treeEntries.push({
+            path: relativePath,
+            mode: '100644' as "100644",
+            type: 'blob' as "blob",
+            sha: blobData.sha,
+            });
+  
+            // Remove from existing files map to track deletions
+            existingFiles.delete(relativePath);
+        }
+  
+        // Step 5: Handle deletions: remaining files in existingFiles are deleted locally
+        for (const [filePath, sha] of existingFiles) {
+            // Exclude these files from the new tree to delete them
+            app.log.info(`File marked for tree removal since it hasn't changed deletion: ${filePath}`);
+        }
+    
+        if (treeEntries.length === 0) {
+            app.log.info('No changes detected. Skipping commit.');
+            return;
+        }
+  
+        // Step 6: Create a new tree
+        const { data: newTree } = await octokit.rest.git.createTree({
+            owner: repoOwner,
+            repo: repoName,
+            tree: treeEntries,
+            base_tree: baseTreeSha,
+        });
+    
+        // Step 7: Create a new commit
+        const { data: newCommit } = await octokit.rest.git.createCommit({
+            owner: repoOwner,
+            repo: repoName,
+            message,
+            tree: newTree.sha,
+            parents: [latestCommitSha],
+        });
+  
+        // Step 8: Update the branch reference to point to the new commit
+        await octokit.rest.git.updateRef({
+            owner: repoOwner,
+            repo: repoName,
+            ref: `heads/${branch}`,
+            sha: newCommit.sha,
+        });
+    
+      app.log.info(`Successfully committed changes to ${branch} branch.`);
     } catch (error: any) {
         app.log.error(`Failed to commit and push changes: ${error.message}`);
         throw error;
@@ -346,8 +510,8 @@ export async function getChangedFiles(app: Probot, git: SimpleGit, contentRootDi
                 // Handle renamed files (they have old and new names)
                 if (status === 'R' || status.startsWith('R')) {
                     return {
-                        filename,  // new name
-                        oldFilename,  // old name
+                        filename,                               // new name
+                        oldFilename,                            // old name
                         status: 'renamed'
                     };
                 }
@@ -438,7 +602,7 @@ export async function hideBotComments(app: Probot, context: Context<'pull_reques
 			owner: repoOwner,
 			repo: repoName,
 			pull_number: prNumber,
-			per_page: 100,              // Fetch up to 100 reviews per page
+			per_page: 100,
 			}
 		);
 
@@ -469,7 +633,7 @@ export async function hideBotComments(app: Probot, context: Context<'pull_reques
                 continue;
             }
 
-            // Use GraphQL to minimize the review
+           //  Use GraphQL to minimize the review
             const query = `
                 mutation MinimizeComment($id: ID!) {
                     minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) {

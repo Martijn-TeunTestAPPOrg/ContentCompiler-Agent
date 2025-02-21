@@ -1,6 +1,6 @@
 import { simpleGit } from "simple-git";
 import { Probot, Context } from "probot";
-import { getPayloadInfo, resetGit, getInstallationToken, configureGit, clearTempStorage, cloneRepo, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, copyFolder, updateRemote, deleteBuildFolder, deleteReports } from "./helpers.js";
+import { getPayloadInfo, resetGit, getInstallationId, configureGit, clearTempStorage, cloneRepo, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, copyFolder, updateRemote, deleteBuildFolder, deleteReports, listFiles } from "./helpers.js";
 
 
 let git = simpleGit();
@@ -20,6 +20,8 @@ const compileCommand: string = process.env.MAIN_COMPILE_COMMAND || 'python src/s
 
 
 export const mainCompile = async (app: Probot, context: Context<'push'>) => {
+    const startTime = Date.now();
+
     const { repoOwner, repoName } = getPayloadInfo(context);
     
     app.log.info(`Push event received for ${repoOwner}/${repoName}`);
@@ -28,7 +30,7 @@ export const mainCompile = async (app: Probot, context: Context<'push'>) => {
     git = await resetGit(git);
 
     // Step 2: Get the installation token
-    const token = await getInstallationToken(app, context);
+    const token = await getInstallationId(app, context);
 
     // Step 3: Configure git context so it can push to the Leerlijn SE repo
     const remoteUrl = `https://x-access-token:${token}@github.com/${repoOwner}/${repoName}.git`;
@@ -59,7 +61,8 @@ export const mainCompile = async (app: Probot, context: Context<'push'>) => {
     await deleteFolderRecursive(app, contentBuildDir);
 
     // Step 11: Commit and push reports to the 'content' branch
-    await updateRemote(app, git, contentSourceBranch, reportFiles, "Reports updated");
+    const contentRootDirFiles = listFiles(contentRootDir);
+    await updateRemote(app, context, contentSourceBranch, contentRootDirFiles, "Reports updated");
 
     // Step 12: Remove everything from content_repo
     try {
@@ -95,10 +98,16 @@ export const mainCompile = async (app: Probot, context: Context<'push'>) => {
     await copySpecificFiles(app, reportFiles, tempStorageDir, contentRootDir);
 
     // Step 20: Commit and push the compiled files and reports to the 'staging' branch
-    await updateRemote(app, git, stagingBranch, [...reportFiles, 'build/'], "Compiled content updated");
+    const stagingRootDirFiles = listFiles(contentRootDir);
+    await updateRemote(app, context, stagingBranch, stagingRootDirFiles, "Compiled content updated");
+    // await updateRemote(app, git, stagingBranch, [...reportFiles, 'build/'], "Compiled content updated");
 
     // Step 21: Remove the cloned repo directory
     await clearTempStorage(app, contentRootDir, tempStorageDir, datasetDir);
 
     app.log.info('Content compilation completed successfully!');
+
+    const endTime = Date.now();
+    const elapsedTime = (endTime - startTime) / 1000;
+    app.log.info(`Elapsed time: ${elapsedTime} seconds`);
 }
