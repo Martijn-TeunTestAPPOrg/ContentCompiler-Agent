@@ -13,12 +13,13 @@
   ],
   "scripts": {
     "build": "tsc",
-    "start": "probot run ./lib/index.js",
+    "start": "probot run ./lib/index.js | pino-pretty",
     "test": "vitest"
   },
   "dependencies": {
     "@octokit/rest": "^21.1.0",
-    "probot": "^13.4.1"
+    "probot": "^13.4.1",
+    "pino-pretty": "^13.0.0"
     },
   "devDependencies": {
     "@types/node": "^20.0.0",

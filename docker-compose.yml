@@ -1,0 +1,10 @@
+version: '1'
+services: 
+  content-compiler:
+    build:
+      context: ./contentCompiler/
+      dockerfile: ./Dockerfile
+    develop:
+      watch:
+        - action: rebuild
+          path: ./contentCompiler/
