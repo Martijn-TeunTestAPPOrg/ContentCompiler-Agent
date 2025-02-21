@@ -11,10 +11,10 @@
     "strict": true,
 
     /* Additional Checks */
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
 
     "moduleResolution": "Node16",
     "esModuleInterop": true,

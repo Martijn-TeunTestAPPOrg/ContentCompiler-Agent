@@ -2,10 +2,10 @@
   "name": "content-compiler",
   "version": "1.0.0",
   "private": true,
-  "description": "A Probot app",
-  "author": "Teamleads SA",
+  "description": "A custom made content compiler app for the Windows Leerlijn SE repo.",
+  "author": "Teamleads Student Assistants 2024-2025",
   "license": "ISC",
-  "homepage": "https://github.com//",
+  "homepage": "https://github.com/",
   "keywords": [
     "probot",
     "github",
@@ -18,10 +18,8 @@
   },
   "dependencies": {
     "@octokit/rest": "^21.1.0",
-    "child_process": "^1.0.2",
-    "probot": "^13.4.1",
-    "simple-git": "^3.27.0"
-  },
+    "probot": "^13.4.1"
+    },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "nock": "^14.0.0-beta.5",

@@ -74,3 +74,10 @@ The main compile process is triggered by push events to the content branch. It p
 3. Compiles the content.
 4. Copies reports to the storage folder.
 5. Commits and pushes the compiled files and reports to the `staging` branch.
+
+
+---
+
+Made by
+- Martijn Schuman
+- Teun van der Kleij

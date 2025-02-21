@@ -3,6 +3,7 @@ import { isAppCommit } from "./helpers.js";
 import { preCompile } from "./preCompile.js";
 import { mainCompile } from "./mainCompile.js";
 
+
 export default (app: Probot) => {
 	// Main compile
 	app.on("push", async (context) => {

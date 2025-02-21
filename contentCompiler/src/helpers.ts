@@ -3,8 +3,6 @@ import * as fs from "fs";
 import { createHash } from "crypto";
 import { exec } from "child_process";
 import { Probot, Context } from "probot";
-import { SimpleGit, simpleGit } from "simple-git";
-
 
 // Helper function to check if the commit is from our app
 export function isAppCommit(context: Context<'push'>) {
@@ -23,37 +21,6 @@ export function getPayloadInfo(context: Context<any>) {
     const repoName = payload.repository.name;
 
     return { repoOwner, repoName };
-}
-
-// Helper function to reset git settings
-export async function resetGit(git: SimpleGit) {
-    git = simpleGit({ baseDir: process.cwd() });
-    
-    // Check if 'origin' remote exists before removing it
-    const remotes = await git.getRemotes();
-    if (remotes.some(remote => remote.name === 'origin')) {
-        await git.remote(['remove', 'origin']);
-    }
-
-    await git.cwd(process.cwd());
-
-    return git;
-}
-
-// Helper function to get the installation token
-export async function getInstallationId(app: Probot, context: Context<any>) {
-    const octokit = await app.auth();
-    const installationId = context.payload.installation?.id;
-    if (!installationId) {
-        throw new Error('No installation ID found');
-    }
-
-    const { token } = await octokit.auth({
-        type: 'installation',
-        installationId
-    }) as { token: string };
-
-    return token;
 }
 
 // Helper function to clear temp storage
@@ -87,73 +54,84 @@ export function clearTempStorage(app: Probot, contentRootDir: string, tempStorag
     }
 }
 
-// Helper function to configure git
-export async function configureGit(git: SimpleGit, gitAppName: string, gitAppEmail: string) {
-    if (!gitAppName || !gitAppEmail) {
-        throw new Error('Git app name or email not configured in environment variables');
-    }
-    // Set user info explicitly
-    await git.addConfig("user.name", gitAppName, false, 'local');
-    await git.addConfig("user.email", gitAppEmail, false, 'local');
-    // Set committer info explicitly
-    await git.addConfig("committer.name", gitAppName, false, 'local');
-    await git.addConfig("committer.email", gitAppEmail, false, 'local');
-}
-
 // Helper function to delete a folder recursively
 export function deleteFolderRecursive(app: Probot, folderPath: string) {
     if (fs.existsSync(folderPath)) {
-        const files = fs.readdirSync(folderPath);
-
-        files.forEach((file) => {
-            const currentPath = path.join(folderPath, file);
-
-            if (fs.statSync(currentPath).isDirectory()) {
-                deleteFolderRecursive(app,currentPath);
-            } else {
-                fs.unlinkSync(currentPath);
-            }
-        });
-
-        fs.rmdirSync(folderPath);
+        fs.rmSync(folderPath, { recursive: true, force: true });
     } else {
         app.log.warn(`Folder ${folderPath} does not exist`);
     }
 }
 
 // Helper function to clone a repo
-export async function cloneRepo(app: Probot, git: SimpleGit, repo: string, targetDirectory: string) {
+export async function cloneRepo(app: Probot, repo: string, targetDirectory: string) {
     try {
-        // Find the git executable debug only
-        //@ts-ignore
-        const whichGit = exec('where git', (error, stdout, stderr) => {
-            if (error) {
-                app.log.error(`Error finding git: ${stderr}`);
-                throw new Error('Git is not available in the PATH');
-            }
-            console.log(`Git found at: ${stdout.trim()}`);
+        // Check if the directory exists and remove it before cloning
+        if (fs.existsSync(targetDirectory)) {
+            app.log.info(`Removing existing directory: ${targetDirectory}`);
+            fs.rmSync(targetDirectory, { recursive: true, force: true });
+        }
+
+        await new Promise<void>((resolve, reject) => {
+            exec(`git clone ${repo} ${targetDirectory}`, (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                    app.log.error(`Error cloning repo: ${stderr}`);
+                    reject(new Error(`Error cloning repo: ${stderr}`));
+                    return;
+                }
+                app.log.info(`Repository cloned successfully to ${targetDirectory}: ${stdout}`);
+                resolve();
+            });
         });
 
-        // Remove the target directory if it exists
-        deleteFolderRecursive(app, targetDirectory);
-
-        // Clones the repo to a specific folder
-        await git.clone(repo, targetDirectory);
-        app.log.info(`Repo cloned successfully to ${targetDirectory}`);
+        // Ensure all branches are fetched
+        await new Promise<void>((resolve, reject) => {
+            //@ts-ignore
+            exec(`cd ${targetDirectory} && git fetch --all`, (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                    app.log.error(`Error fetching branches: ${stderr}`);
+                    reject(new Error(`Error fetching branches: ${stderr}`));
+                    return;
+                }
+                app.log.info(`Fetched all branches for: ${repo}`);
+                resolve();
+            });
+        });
     } catch (error: any) {
         app.log.error(`Failed to clone repo ${repo}: ${error.message}`);
         throw error;
     }
 }
 
-// Helper function to checkout a branch
-export async function checkoutBranch(app: Probot, git: SimpleGit, branch: string) {
+export async function checkoutBranch(app: Probot, branch: string, targetDirectory: string) {
     try {
-        await git.checkout(branch);
-        await git.pull('origin', branch);
-        app.log.info(`Checked out and pulled branch ${branch}`);
+        await new Promise<void>((resolve, reject) => {
+            exec(`cd ${targetDirectory} && git fetch --all`, (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                    app.log.error(`Error fetching branches before checkout: ${stderr}`);
+                    reject(new Error(`Error fetching branches before checkout: ${stderr}`));
+                    return;
+                }
+                app.log.info(`Fetched all branches before checkout: ${stdout}`);
+                resolve();
+            });
+        });
+
+        await new Promise<void>((resolve, reject) => {
+            //@ts-ignore
+            exec(`cd ${targetDirectory} && git checkout -b ${branch} origin/${branch}`, (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                    app.log.error(`Failed to checkout branch ${branch}: ${stderr}`);
+                    reject(new Error(`Failed to checkout branch ${branch}: ${stderr}`));
+                    return;
+                }
+                app.log.info(`Checked out branch ${branch}`);
+                resolve();
+            });
+        });
+
     } catch (error: any) {
-        app.log.error(`Failed to checkout or pull branch ${branch}: ${error.message}`);
+        app.log.error(`Failed to checkout branch ${branch}: ${error.message}`);
         throw error;
     }
 }
@@ -182,12 +160,12 @@ export async function compileContent(app: Probot, compileCommand: string) {
             if (code === 0) {
                 app.log.info('Python script output:');
 
-                // if(stdoutData) {
-                //     app.log.info(stdoutData);
-                // }
-                // if(stderrData) {
-                //     app.log.info(stderrData);
-                // }
+                if(stdoutData) {
+                    app.log.info(stdoutData);
+                }
+                if(stderrData) {
+                    app.log.info(stderrData);
+                }
 
                 app.log.info(`Content compilation process completed`);
                 resolve();
@@ -409,6 +387,7 @@ export async function updateRemote(app: Probot, context: Context<any>, branch: s
         }
   
         // Step 5: Handle deletions: remaining files in existingFiles are deleted locally
+        //@ts-ignore
         for (const [filePath, sha] of existingFiles) {
             // Exclude these files from the new tree to delete them
             app.log.info(`File marked for tree removal since it hasn't changed: ${filePath}`);
@@ -459,13 +438,13 @@ export async function updateRemote(app: Probot, context: Context<any>, branch: s
 }
 
 // Helper function to delete the build folder
-export async function deleteBuildFolder(app: Probot, git: SimpleGit, contentBuildDir: string) {
+export async function deleteBuildFolder(app: Probot, contentBuildDir: string) {
     try {
         const resolvedContentBuildDir = path.resolve(contentBuildDir);
         app.log.info(`Removing the build directory from the staging branch: ${resolvedContentBuildDir}`);
 
         if (fs.existsSync(resolvedContentBuildDir)) {
-            await git.rm(['-r', resolvedContentBuildDir]);
+            fs.rmSync(resolvedContentBuildDir, { recursive: true });
             deleteFolderRecursive(app, resolvedContentBuildDir);
             app.log.info(`Build directory ${resolvedContentBuildDir} removed successfully`);
         } else {
@@ -478,7 +457,7 @@ export async function deleteBuildFolder(app: Probot, git: SimpleGit, contentBuil
 }
 
 // Helper function to delete the reports
-export async function deleteReports(app: Probot, git: SimpleGit, fileDir: string, reportFiles: string[]) {
+export async function deleteReports(app: Probot, fileDir: string, reportFiles: string[]) {
     try {
         app.log.info('Removing the reports from the staging branch...');
 
@@ -486,8 +465,8 @@ export async function deleteReports(app: Probot, git: SimpleGit, fileDir: string
             // Get the resolved file path since the reportFiles array contains only the file names
             const resolvedFilePath = path.resolve(fileDir, file);
             if (fs.existsSync(resolvedFilePath)) {
-                // Remove the file from the git staging area, this doesn't use the resolved path, since these are in the git staging area
-                await git.rm(file);
+                // Unlink and remove the file
+                fs.unlinkSync(resolvedFilePath);
                 app.log.info(`Report ${resolvedFilePath} removed successfully`);
             } else {
                 app.log.error(`Report ${resolvedFilePath} does not exist!`);
@@ -500,45 +479,46 @@ export async function deleteReports(app: Probot, git: SimpleGit, fileDir: string
 }
 
 // Helper function to see which files are changed in the PR
-export async function getChangedFiles(app: Probot, git: SimpleGit, contentRootDir: string, baseBranch: string, headBranch: string) {
+export async function getChangedFiles(app: Probot, context: Context<'pull_request'>, baseBranch: string, headBranch: string) {
     try {
         app.log.info(`Getting changed files between ${baseBranch} and ${headBranch}...`);
 
-        // Fetch both branches to ensure we have the latest
-        await git.cwd(contentRootDir).fetch(['origin', baseBranch]);
-        await git.cwd(contentRootDir).fetch(['origin', headBranch]);
-        
-        // Get the diff between base and head
-        const diff = await git.cwd(contentRootDir)
-            .diff([`origin/${baseBranch}...origin/${headBranch}`, '--name-status']);
-        
-        // Parse the diff output into a more useful format
-        return diff.split('\n')
-            .filter(line => line.trim().length > 0)
-            .map(line => {
-                const [status, oldFilename, filename] = line.split('\t');
-                
-                // Handle renamed files (they have old and new names)
-                if (status === 'R' || status.startsWith('R')) {
-                    return {
-                        filename,                               // new name
-                        oldFilename,                            // old name
-                        status: 'renamed'
-                    };
-                }
+        const { owner, repo, issue_number: pull_number } = context.issue();
 
-                // Handle added, modified, deleted, copied, unmerged, type_changed
+        // Get the list of files changed in the pull request
+        const { data: files } = await context.octokit.pulls.listFiles({
+            owner,
+            repo,
+            pull_number,
+        });
+
+        // Parse the files into a more useful format
+        return files.map(file => {
+            const status = file.status;
+            const filename = file.filename;
+            const oldFilename = file.previous_filename;
+
+            // Handle renamed files (they have old and new names)
+            if (status === 'renamed') {
                 return {
-                    filename: oldFilename,
-                    status: status === 'A' ? 'added' :           // Added
-                           status === 'M' ? 'modified' :         // Modified
-                           status === 'D' ? 'deleted' :          // Deleted
-                           status === 'C' ? 'copied' :           // Copied
-                           status === 'U' ? 'unmerged' :         // Unmerged (conflict)
-                           status === 'T' ? 'type_changed' :     // File type changed
-                           status
+                    filename,                                   // new name
+                    oldFilename,                                // old name
+                    status: 'renamed'
                 };
-            });
+            }
+
+            // Handle added, modified, deleted, copied, unmerged, type_changed
+            return {
+                filename,
+                status: status === 'added' ? 'added' :           // Added
+                       status === 'modified' ? 'modified' :      // Modified
+                       status === 'removed' ? 'deleted' :        // Deleted
+                       status === 'copied' ? 'copied' :          // Copied
+                       status === 'unchanged' ? 'unmerged' :     // Unmerged (conflict)
+                       status === 'changed' ? 'type_changed' :   // File type changed
+                       status
+            };
+        });
     } catch (error) {
         app.log.error(`Error getting PR changed files: ${error}`);
         throw error;
