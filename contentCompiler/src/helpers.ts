@@ -2,10 +2,7 @@ import path from "path";
 import * as fs from "fs";
 import { exec } from "child_process";
 import { Probot, Context } from "probot";
-import { SimpleGit, simpleGit } from "simple-git";
-
-const gitAppName: string = process.env.GITHUB_APP_NAME || '';
-const gitAppEmail: string = process.env.GITHUB_APP_EMAIL || '';
+import { SimpleGit } from "simple-git";
 
 // Helper function to check if the commit is from our app
 export function isAppCommit(context: Context<'push'>) {
@@ -17,6 +14,20 @@ export function isAppCommit(context: Context<'push'>) {
            commits.some(commit => commit.message.includes('[bot-commit]'));
 }
 
+// Helper function to configure git
+export async function configureGit(git: SimpleGit, gitAppName: string, gitAppEmail: string) {
+    if (!gitAppName || !gitAppEmail) {
+        throw new Error('Git app name or email not configured in environment variables');
+    }
+    // Set user info explicitly
+    await git.addConfig("user.name", gitAppName, false, 'local');
+    await git.addConfig("user.email", gitAppEmail, false, 'local');
+
+    // Set committer info explicitly
+    await git.addConfig("committer.name", gitAppName, false, 'local');
+    await git.addConfig("committer.email", gitAppEmail, false, 'local');
+}
+
 // Helper function to get default configuration values
 export function getPayloadInfo(context: Context<any>) {
     const payload = context.payload;
@@ -24,37 +35,6 @@ export function getPayloadInfo(context: Context<any>) {
     const repoName = payload.repository.name;
 
     return { repoOwner, repoName };
-}
-
-// Helper function to reset git settings
-export async function resetGit(git: SimpleGit) {
-    git = simpleGit({ baseDir: process.cwd() });
-    
-    // Check if 'origin' remote exists before removing it
-    const remotes = await git.getRemotes();
-    if (remotes.some(remote => remote.name === 'origin')) {
-        await git.remote(['remove', 'origin']);
-    }
-
-    await git.cwd(process.cwd());
-
-    return git;
-}
-
-// Helper function to get the installation token
-export async function getInstallationToken(app: Probot, context: Context<any>) {
-    const octokit = await app.auth();
-    const installationId = context.payload.installation?.id;
-    if (!installationId) {
-        throw new Error('No installation ID found');
-    }
-
-    const { token } = await octokit.auth({
-        type: 'installation',
-        installationId
-    }) as { token: string };
-
-    return token;
 }
 
 // Helper function to clear temp storage
@@ -88,19 +68,6 @@ export function clearTempStorage(app: Probot, contentRootDir: string, tempStorag
     }
 }
 
-// Helper function to configure git
-export async function configureGit(git: SimpleGit, gitAppName: string, gitAppEmail: string) {
-    if (!gitAppName || !gitAppEmail) {
-        throw new Error('Git app name or email not configured in environment variables');
-    }
-    // Set user info explicitly
-    await git.addConfig("user.name", gitAppName, false, 'local');
-    await git.addConfig("user.email", gitAppEmail, false, 'local');
-    // Set committer info explicitly
-    await git.addConfig("committer.name", gitAppName, false, 'local');
-    await git.addConfig("committer.email", gitAppEmail, false, 'local');
-}
-
 // Helper function to delete a folder recursively
 export function deleteFolderRecursive(app: Probot, folderPath: string) {
     if (fs.existsSync(folderPath)) {
@@ -125,19 +92,6 @@ export function deleteFolderRecursive(app: Probot, folderPath: string) {
 // Helper function to clone a repo
 export async function cloneRepo(app: Probot, git: SimpleGit, repo: string, targetDirectory: string) {
     try {
-        // Log the PATH environment variable
-        app.log.info(`Current PATH: ${process.env.PATH}`);
-
-        // Ensure git is available in the PATH
-        // @ts-ignore
-        const whichGit = exec('where git', (error, stdout, stderr) => {
-            if (error) {
-                app.log.error(`Error finding git: ${stderr}`);
-                throw new Error('Git is not available in the PATH');
-            }
-            console.log(`Git found at: ${stdout.trim()}`);
-        });
-
         // Remove the target directory if it exists
         deleteFolderRecursive(app, targetDirectory);
 
@@ -264,12 +218,19 @@ export async function updateRemote(app: Probot, git: SimpleGit, branch: string, 
     try {
         app.log.info(`Committing and pushing changes to the ${branch} branch...`);
 
+        // Ensure the remote URL is set correctly to SSH
+        const remotes = await git.getRemotes(true);
+        const originRemote = remotes.find(remote => remote.name === 'origin');
+
+        if (!originRemote || !originRemote.refs.fetch.startsWith('git@github.com:')) {
+            throw new Error(`Origin remote is missing or not using SSH. Found: ${originRemote?.refs.fetch}`);
+        }
+
         await git.add(items);
         const status = await git.status();
 
         if (!status.isClean()) {
             await git.commit(message, undefined, {
-                '--author': `${gitAppName} <${gitAppEmail}>`,
                 '--no-verify': null
             });
             await git.push('origin', branch);

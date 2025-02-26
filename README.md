@@ -74,3 +74,61 @@ The main compile process is triggered by push events to the content branch. It p
 3. Compiles the content.
 4. Copies reports to the storage folder.
 5. Commits and pushes the compiled files and reports to the `staging` branch.
+
+
+## Github user config
+You're off to a great start! Here are a few **missing steps** and improvements to make sure your colleagues can fully set up their bot authentication.  
+
+---
+
+### **🔹 What’s Missing?**  
+✅ **Configuring SSH to use the key automatically**  
+✅ **Setting up the correct Git username & email**  
+✅ **Updating `~/.ssh/config` for easier SSH usage**  
+✅ **Configuring Git to use SSH instead of HTTPS**  
+✅ **Testing SSH-based Git operations (clone, commit, push)**  
+
+---
+
+### **🔹 Updated Steps for README**  
+
+## **GitHub User Configuration for Bot Authentication**
+### **1. Generate an SSH Key**  
+Run the following command to create a new SSH key:  
+```sh
+ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
+```
+1.1 **Name the key**: `id_rsa_github_bot`  
+1.2 **Leave the passphrase empty** when prompted  
+
+### **2. Add the SSH Key to GitHub**  
+Go to **GitHub.com → Settings → SSH and GPG keys → New SSH Key**, then:  
+- **Title**: `BotAuth`  
+- **Key Type**: `Authentication`  
+- **Key**: Copy & paste the contents of `id_rsa_github_bot.pub`  
+
+### **3. Move the Key to the Correct Location**  
+Move both the private (`id_rsa_github_bot`) and public (`id_rsa_github_bot.pub`) keys to the `.ssh` folder:  
+```sh
+mv id_rsa_github_bot* ~/.ssh/
+```
+
+### **4. Test SSH Connection**  
+Run:  
+```sh
+ssh -T git@github.com
+```
+Expected output:  
+```sh
+Hi [your-username]! You've successfully authenticated, but GitHub does not provide shell access.
+```
+If this fails, run:  
+```sh
+ssh -i ~/.ssh/id_rsa_github_bot -T git@github.com
+```
+
+---
+
+Made by
+- Martijn Schuman
+- Teun van der Kleij

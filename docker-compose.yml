@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  content-compiler:
+    build:
+      context: ./contentCompiler/
+      dockerfile: ./Dockerfile
+    volumes:
+      - ${USERPROFILE}/.ssh/id_rsa_github_bot:/root/.ssh/id_rsa:ro  # Use environment variable
+      - ${USERPROFILE}/.ssh/known_hosts:/root/.ssh/known_hosts:ro  # Use environment variable
+      - ./contentCompiler:/app  # Mount code for live updates
+    environment:
+      - GIT_SSH_COMMAND=ssh -i /root/.ssh/id_rsa -o UserKnownHostsFile=/root/.ssh/known_hosts
+    develop:
+      watch:
+        - action: rebuild
+          path: ./contentCompiler/
