@@ -2,13 +2,13 @@ import path from "path";
 import * as fs from "fs";
 import { SimpleGit } from "simple-git";
 import { Probot, Context } from "probot";
-import { getPayloadInfo, clearTempStorage, cloneRepo, configureGit, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, getChangedFiles, checkIllegalChanges, postPRReview, hideBotComments } from "./helpers.js";
+import { getPayloadInfo, resetGitConfig, clearTempStorage, cloneRepo, configureGit, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, getChangedFiles, checkIllegalChanges, postPRReview, hideBotComments } from "./helpers.js";
 
 // This variable is used to keep track of the steps that have been executed
 var stepNineReviewId: number | undefined;
 
-const gitAppName: string = process.env.GITHUB_APP_NAME || '';
-const gitAppEmail: string = process.env.GITHUB_APP_EMAIL || '';
+const gitAppName: string = process.env.GITHUB_USER_NAME || '';
+const gitAppEmail: string = process.env.GITHUB_USER_EMAIL || '';
 const contentRepoUrl: string = process.env.LEERLIJN_CONTENT_REPO_URL || '';
 const datasetRepoUrl: string = process.env.DATASET_REPO_URL || '';
 const datasetDir: string = process.env.DATASET_FOLDER || 'src/storage/dataset';
@@ -33,36 +33,39 @@ export const preCompile = async (app: Probot, context: Context<'pull_request'>, 
     app.log.info(`Base branch: ${baseBranch}`);
     app.log.info(`Head branch: ${headBranch}`);
 
-    // Step 1: Remove the temp folders
+    // Step 1: Reset the git configuration
+    await resetGitConfig(git);
+
+    // Step 2: Remove the temp folders
     await clearTempStorage(app, contentRootDir, tempStorageDir, datasetDir);
 
-    // Step 2: Clone the dataset
+    // Step 3: Clone the dataset
     await cloneRepo(app, git, datasetRepoUrl, datasetDir);
-
-    // Step 3: Sets the global git configuration
-    await configureGit(git, gitAppName, gitAppEmail);
 
     // Step 4: Clone the content repository
     await cloneRepo(app, git, contentRepoUrl, contentRootDir);
     await git.cwd(contentRootDir);
 
-    // Step 5: Checkout to the 'head' branch
+    // Step 5: Sets the global git configuration
+    await configureGit(git, gitAppName, gitAppEmail);
+
+    // Step 6: Checkout to the 'head' branch
     await checkoutBranch(app, git, headBranch);
 
-    // Step 6: Get the changed files in the PR
+    // Step 7: Get the changed files in the PR
     changedFiles = await getChangedFiles(app, git, contentRootDir, baseBranch, headBranch);
 
-    // Step 7: Check for illegal changed files
+    // Step 8: Check for illegal changed files
     const illegalChangedFiles: string[] = await checkIllegalChanges(app, prNumber, changedFiles);
 
-    // Step 7.1: Post a review if there are illegal changes
+    // Step 8.1: Post a review if there are illegal changes
     if (illegalChangedFiles.length > 0) {
         const formattedFiles = illegalChangedFiles.join('\n');
         const commentBody = `# **Aanpassingen buiten content gevonden, niet toegestaan!** \n ## Gevonden bestanden: \n \`\`\` \n ${formattedFiles} \n \`\`\` \n\n Gelieve alleen aanpassingen te maken in de content map.`;
         stepNineReviewId = await postPRReview(app, context, repoOwner, repoName, prNumber, 'REQUEST_CHANGES', commentBody);
     }
 
-    // Step 8: Copy the changed files to the storage folder
+    // Step 9: Copy the changed files to the storage folder
     await copySpecificFiles(app, 
         changedFiles
             .filter(({ status }) => 
@@ -71,7 +74,7 @@ export const preCompile = async (app: Probot, context: Context<'pull_request'>, 
             .map(({ filename }) => filename), 
         contentRootDir, tempStorageDir);
 
-    // Step 9: Remove the cloned repository
+    // Step 10: Remove the cloned repository
     try {
         app.log.info('Removing the cloned repository...');
         await deleteFolderRecursive(app, contentRootDir);
@@ -80,7 +83,7 @@ export const preCompile = async (app: Probot, context: Context<'pull_request'>, 
         throw error;
     }
 
-    // Step 10: Move the temp storage folder to the cloned repo folder
+    // Step 11: Move the temp storage folder to the cloned repo folder
     try {
         app.log.info('Moving the temp storage folder to the cloned repo folder...');
         fs.renameSync(tempStorageDir, contentRootDir);
@@ -89,20 +92,20 @@ export const preCompile = async (app: Probot, context: Context<'pull_request'>, 
         throw error;
     }
 
-    // Step 11: Compile the content
+    // Step 12: Compile the content
     await compileContent(app, compileCommand);
 
-    // Step 12: Hide previous bot comments before posting a new one
+    // Step 13: Hide previous bot comments before posting a new one
     await hideBotComments(app, context, repoOwner, repoName, prNumber, stepNineReviewId);
 
-    // Step 13: Create a review with the compiled content
+    // Step 14: Create a review with the compiled content
     // Read the content report file and post it as a review body
     const reportPath = path.join(contentRootDir, 'content_report.md');
     const reportContent = fs.readFileSync(reportPath, 'utf8');
     const action = illegalChangedFiles.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
     await postPRReview(app, context, repoOwner, repoName, prNumber, action, reportContent);
 
-    // Step 14: Remove the temp storage folder
+    // Step 15: Remove the temp storage folder
     await clearTempStorage(app, contentRootDir, tempStorageDir, datasetDir);
 
     app.log.info('Pre-compile completed successfully');

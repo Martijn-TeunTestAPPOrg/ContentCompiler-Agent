@@ -1,6 +1,6 @@
 FROM node:22.14.0-alpine
 
-# Install Python, Git, and OpenSSH (for ssh-keyscan)
+# Install dependencies
 RUN apk add --no-cache python3 py3-pip git openssh-client
 
 WORKDIR /usr/src/app
@@ -9,13 +9,20 @@ RUN npm ci --production
 RUN npm cache clean --force
 ENV NODE_ENV="production"
 
-# Create and activate a virtual environment, then install Python dependencies
+# Copy SSH key and known_hosts
+COPY .ssh/id_rsa_github_bot /root/.ssh/id_rsa
+COPY .ssh/id_rsa_github_bot.pub /root/.ssh/id_rsa.pub
+
+# Fix SSH key permissions
+RUN chmod 600 /root/.ssh/id_rsa && chmod 644 /root/.ssh/id_rsa.pub
+
+# Add GitHub to known hosts
+RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
+
+# Install Python dependencies
 COPY /src/scripts/requirements.txt ./
 RUN python3 -m venv venv
 RUN . venv/bin/activate && pip install --no-cache-dir -r requirements.txt
-
-# Add GitHub to known hosts
-RUN mkdir -p /root/.ssh && ssh-keyscan github.com > /root/.ssh/known_hosts
 
 COPY . .
 RUN npm run build

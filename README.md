@@ -1,20 +1,20 @@
-# Content Compiler GitHub App
+# **Content Compiler GitHub App**
 
 This repository contains a GitHub App built with Probot that automates the process of compiling and validating Markdown files based on taxonomy codes. The app listens to specific GitHub events and triggers pre-compilation and main compilation processes accordingly.
 
-## Features
+## **Features**
 - **Pre-Compile**: Triggered on pull request events (`opened`, `reopened`, `synchronize`) targeting the `content` branch.
 - **Main Compile**: Triggered on push events to the `content` branch.
 - **Validation**: Ensures that only allowed files are changed and checks for unmerged files in pull requests.
 - **Reporting**: Generates and commits reports to the repository.
 
-## Getting Started
-### Prerequisites
+## **Getting Started**
+### **Prerequisites**
 - Node.js
 - npm
 - A GitHub App with the necessary permissions and events configured
 
-### Installation
+### **Installation**
 1. Clone the repository:
 
 2. Install dependencies:
@@ -27,8 +27,7 @@ This repository contains a GitHub App built with Probot that automates the proce
     cp .env.example .env
     ```
 
-### Building and Running
-
+### **Building and Running**
 1. Build the project:
     ```sh
     npm run build
@@ -39,58 +38,60 @@ This repository contains a GitHub App built with Probot that automates the proce
     npm start
     ```
 
-## Configuration
+### **Docker**
+1. Run the project with `docker compose up`
 
+## **Configuration**
 The app is configured using environment variables. The following variables need to be set in the `.env` file:
 
-- `WEBHOOK_PROXY_URL`
-- `APP_ID`
-- `PRIVATE_KEY`
-- `WEBHOOK_SECRET`
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `INSTALLATION_ID`
-- `GITHUB_APP_NAME=`
-- `GITHUB_APP_EMAIL=`
-- `CLONE_REPO_FOLDER=`
-- `TEMP_STORAGE_FOLDER=`
+### App config
+These environment variables are required to run the probot bot
+- `WEBHOOK_PROXY_URL=`                              // This is the URL which the GitHub app posts a webhook request to, it activates this app
+- `APP_ID=`                                         // The app id as seen in the GitHub app config
+- `PRIVATE_KEY=`                                    // The private key which is configured in the GitHub app config
+- `WEBHOOK_SECRET=`                                 // Secret for the webhook to secure communication, which is configured in the GitHub app config
 
-## Usage
-### Pre-Compile
+### App config
+These environment variables are required for the inner workings.
+Some of these variables are already filled in `.env.example`
+
+- `GITHUB_APP_PR_NAME=`                             // Name of the GitHub App which is shown in the preCompile PR comments, this has to be the same as the GitHub app name 
+- `GITHUB_USER_NAME=`                               // Username of the custom GitHub account which is used for the commits
+- `GITHUB_USER_EMAIL=`                              // Email of the custom GitHub account which is used for the commits
+- `LEERLIJN_CONTENT_REPO_URL=`                      // URL for the leerlijn content repo, this has to be a SSH URL
+- `DATASET_REPO_URL=`                               // URL for the leerlijn content dataset repo, this has to be a SSH URL
+- `CLONE_REPO_FOLDER=`                              // Location where the leerlijn content repo is cloned to
+- `CLONE_REPO_BUILD_FOLDER=`                        // Location where the build folder is, in the current version this is in a subdirectory of CLONE_REPO_FOLDER
+- `TEMP_STORAGE_FOLDER=`                            // Location where the files are stored during the proces, this has to be outside of the cloned repo folder
+- `TEMP_STORAGE_BUILD_FOLDER=`                      // Location where the build folder is, in the current version this is in a subdirectory of TEMP_STORAGE_FOLDER
+- `DATASET_FOLDER=`                                 // Location where the dataset is cloned to
+- `REPORT_FILES=`                                   // Names of the report files, separated by a comma
+- `CONTENT_SRC_BRANCH=`                             // Name of the branch where the src md content is in
+- `STAGING_BRANCH=`                                 // Name of the branch where the compiled files have to go to
+- `MAIN_COMPILE_COMMAND=`                           // Command which is used to activate the Python mainCompile
+- `PRE_COMPILE_COMMAND=`                            // Command which is used to activate the Python preCompile
+
+## **Usage**
+### **Pre-Compile**
 The pre-compile process is triggered by pull request events (`opened`, `reopened`, `synchronize`) targeting the content branch. It performs the following steps:
 
 1. Removes temporary folders.
 2. Clones the repository.
 3. Checks for changed files and validates them.
 4. Compiles the content using a Python script.
-5. Posts a review with the compiled content.
+5. Checks for illegal changed files (files outside of the `content` folder)
+5.1 If found it posts a review
+6. Posts a review with the contents of `content_report.md`
 
-### Main Compile
-
+### **Main Compile**
 The main compile process is triggered by push events to the content branch. It performs the following steps:
 
 1. Removes temporary folders.
 2. Clones the repository.
 3. Compiles the content.
-4. Copies reports to the storage folder.
+4. Commits and pushes the report to the `content` branch
 5. Commits and pushes the compiled files and reports to the `staging` branch.
 
-
-## Github user config
-You're off to a great start! Here are a few **missing steps** and improvements to make sure your colleagues can fully set up their bot authentication.  
-
----
-
-### **🔹 What’s Missing?**  
-✅ **Configuring SSH to use the key automatically**  
-✅ **Setting up the correct Git username & email**  
-✅ **Updating `~/.ssh/config` for easier SSH usage**  
-✅ **Configuring Git to use SSH instead of HTTPS**  
-✅ **Testing SSH-based Git operations (clone, commit, push)**  
-
----
-
-### **🔹 Updated Steps for README**  
 
 ## **GitHub User Configuration for Bot Authentication**
 ### **1. Generate an SSH Key**  
@@ -108,12 +109,16 @@ Go to **GitHub.com → Settings → SSH and GPG keys → New SSH Key**, then:
 - **Key**: Copy & paste the contents of `id_rsa_github_bot.pub`  
 
 ### **3. Move the Key to the Correct Location**  
-Move both the private (`id_rsa_github_bot`) and public (`id_rsa_github_bot.pub`) keys to the `.ssh` folder:  
+Move both the private (`id_rsa_github_bot`) and public (`id_rsa_github_bot.pub`) keys to the `.ssh` folder in the root of `contentCompiler`:  
+
+
+### _Local testing_
+Run:
 ```sh
 mv id_rsa_github_bot* ~/.ssh/
 ```
 
-### **4. Test SSH Connection**  
+#### **4. Test SSH Connection**  
 Run:  
 ```sh
 ssh -T git@github.com
@@ -122,7 +127,7 @@ Expected output:
 ```sh
 Hi [your-username]! You've successfully authenticated, but GitHub does not provide shell access.
 ```
-If this fails, run:  
+If this fails, run to make a new SSH key:  
 ```sh
 ssh -i ~/.ssh/id_rsa_github_bot -T git@github.com
 ```

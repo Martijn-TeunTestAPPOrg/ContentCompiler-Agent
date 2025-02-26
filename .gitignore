@@ -30,3 +30,4 @@ dist-ssr
 **/.obsidian
 /contentCompiler/src/dataset
 /contentCompiler/src/storage
+/contentCompiler/.ssh

@@ -8,10 +8,10 @@ import { SimpleGit } from "simple-git";
 export function isAppCommit(context: Context<'push'>) {
     const sender = context.payload.sender;
     const commits = context.payload.commits || [];
-    
+
     // Check both the sender and the commit message
-    return (sender && sender.type === 'Bot' && sender.login.endsWith('[bot]')) ||
-           commits.some(commit => commit.message.includes('[bot-commit]'));
+    return (sender && sender.type === 'Bot' && sender.login.includes('[bot]')) ||
+           commits.some(commit => commit.message.includes('[bot-commit]') || commit.author.username?.includes('ContentCompiler'));
 }
 
 // Helper function to configure git
@@ -28,7 +28,12 @@ export async function configureGit(git: SimpleGit, gitAppName: string, gitAppEma
     await git.addConfig("committer.email", gitAppEmail, false, 'local');
 }
 
-// Helper function to get default configuration values
+// Helper function to reset git configuration
+export async function resetGitConfig(git: SimpleGit) {
+    await git.cwd(process.cwd());
+}
+
+// Helper function to get payload information from the webhook
 export function getPayloadInfo(context: Context<any>) {
     const payload = context.payload;
     const repoOwner = payload.repository.owner.login;
@@ -335,8 +340,12 @@ export async function getChangedFiles(app: Probot, git: SimpleGit, contentRootDi
 export async function checkIllegalChanges(app: Probot, prNumber: number, changedFiles: { filename: string, status: string }[]) {
     app.log.info(`Checking for illegal changes in PR ${prNumber}...`);
 
+    // Get the report files from the environment
+    const reportFiles = process.env.REPORT_FILES?.split(',') || [];
+    // Filter out files that are not in the content directory or are in the report files
+    // No changes outside the content directory are allowed and the report files are not allowed in content
     const illegalChangedFiles = changedFiles
-        .filter(file => !file.filename.startsWith('content/'))
+        .filter(file => !file.filename.startsWith('content/') || reportFiles.some(reportFile => file.filename.startsWith(`content/${reportFile}`)))
         .map(file => `${file.filename} (${file.status})`);
 
     if (illegalChangedFiles.length > 0) {
@@ -410,7 +419,7 @@ export async function hideBotComments(app: Probot, context: Context<'pull_reques
 
         // Filter out bot comments
         const botReviews = reviews.filter(review =>
-            review.user?.login === process.env.GITHUB_BOT_NAME && 
+            review.user?.login === process.env.GITHUB_APP_PR_NAME && 
             review.user?.type === "Bot"
         );
 

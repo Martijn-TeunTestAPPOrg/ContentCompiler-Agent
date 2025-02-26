@@ -1,10 +1,10 @@
 import { SimpleGit } from "simple-git";
 import { Probot, Context } from "probot";
-import { getPayloadInfo, clearTempStorage, cloneRepo, configureGit, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, copyFolder, updateRemote, deleteBuildFolder, deleteReports } from "./helpers.js";
+import { getPayloadInfo, resetGitConfig, clearTempStorage, cloneRepo, configureGit, checkoutBranch, compileContent, deleteFolderRecursive, copySpecificFiles, copyFolder, updateRemote, deleteBuildFolder, deleteReports } from "./helpers.js";
 
 
-const gitAppName: string = process.env.GITHUB_APP_NAME || '';
-const gitAppEmail: string = process.env.GITHUB_APP_EMAIL || '';
+const gitAppName: string = process.env.GITHUB_USER_NAME || '';
+const gitAppEmail: string = process.env.GITHUB_USER_EMAIL || '';
 const contentRepoUrl: string = process.env.LEERLIJN_CONTENT_REPO_URL || '';
 const contentSourceBranch: string = process.env.CONTENT_BRANCH || 'content';
 const stagingBranch: string = process.env.STAGING_BRANCH || 'staging';
@@ -24,68 +24,58 @@ export const mainCompile = async (app: Probot, context: Context<'push'>, git: Si
     const { repoOwner, repoName } = getPayloadInfo(context);
     app.log.info(`Push event received for ${repoOwner}/${repoName}`);
 
-    // Step 1: Remove the temp folders
+    // Step 1: Reset the git configuration
+    await resetGitConfig(git);
+
+    // Step 2: Remove the temp folders
     await clearTempStorage(app, contentRootDir, tempStorageDir, datasetDir);
 
-    // Step 2: Clone the dataset
+    // Step 3: Clone the dataset
     await cloneRepo(app, git, datasetRepoUrl, datasetDir);
-
-    // Step 3: Sets the global git configuration
-	await configureGit(git, gitAppName, gitAppEmail);
 
     // Step 4: Clone the content repository
     await cloneRepo(app, git, contentRepoUrl, contentRootDir);
     await git.cwd(contentRootDir);
 
-    // Step 5: Checkout to the 'content' branch
+    // Step 5: Sets the global git configuration
+	await configureGit(git, gitAppName, gitAppEmail);
+
+    // Step 6: Checkout to the 'content' branch
     await checkoutBranch(app, git, contentSourceBranch);
 
-    // Step 6: Compile the content
+    // Step 7: Compile the content
     await compileContent(app, compileCommand);
 
-    // Step 7: Copy the reports to the storage folder
+    // Step 8: Copy the reports to the storage folder
     await copySpecificFiles(app, reportFiles, contentRootDir, tempStorageDir);
 
-    // Step 8: Move build to temp_storage
+    // Step 9: Move build to temp_storage
     await copyFolder(app, contentBuildDir, tempDestinationBuildDir);
     await deleteFolderRecursive(app, contentBuildDir);
 
-    // Step 9: Commit and push reports to the 'content' branch
+    // Step 10: Commit and push reports to the 'content' branch
     await updateRemote(app, git, contentSourceBranch, reportFiles, "Reports updated");
 
-    // Step 10: Remove everything from content_repo
-    try {
-        app.log.info(`Removing cloned repository ${repoName}...`);
-        await deleteFolderRecursive(app, contentRootDir);
-    } catch (error: any) {
-        app.log.error(`Failed to remove cloned repo: ${error.message}`);
-        throw error;
-    }
-
-    // Step 11: Clone the content repository
-    await cloneRepo(app, git, contentRepoUrl, contentRootDir);
-    await git.cwd(contentRootDir);
-
-    // Step 12: Checkout to the 'staging' branch
+    // Step 11: Checkout to the 'staging' branch
     await checkoutBranch(app, git, stagingBranch);
 
-    // Step 13: Remove the build directory from the 'staging' branch
+    // Step 12: Remove the build directory from the 'staging' branch
     await deleteBuildFolder(app, git, contentBuildDir);
 
-    // Step 14: Remove the reports from the 'staging' branch
+    // Step 13: Remove the reports from the 'staging' branch
     await deleteReports(app, git, contentRootDir, reportFiles);
 
-    // Step 15: Move the build to the root of the repository
+    // Step 14: Move the build to the root of the repository
     await copyFolder(app, tempDestinationBuildDir, contentBuildDir);
     await deleteFolderRecursive(app, tempDestinationBuildDir);
 
-    // Step 16: Move the reports to the root of the repository
+    // Step 15: Move the reports to the root of the repository
     await copySpecificFiles(app, reportFiles, tempStorageDir, contentRootDir);
 
-    // Step 17: Commit and push the compiled files and reports to the 'staging' branch
+    // Step 16: Commit and push the compiled files and reports to the 'staging' branch
     await updateRemote(app, git, stagingBranch, [...reportFiles, 'build/'], "Compiled content updated");
 
-    // Step 18: Remove the cloned repo directory
+    // Step 17: Remove the cloned repo directory
     await clearTempStorage(app, contentRootDir, tempStorageDir, datasetDir);
 
     app.log.info('Content compilation completed successfully!');
