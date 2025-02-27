@@ -1,6 +1,7 @@
 import winston from "winston";
 import { SimpleGit } from "simple-git";
 import { Probot, Context } from "probot";
+import { handleError } from "./globalHelpers.js";
 import { deleteFolderRecursive } from "./storageHelpers.js";
 
 
@@ -34,8 +35,7 @@ export async function cloneRepo(app: Probot, logger: winston.Logger, git: Simple
         await git.clone(repo, targetDirectory);
         logger.info(`Repo cloned successfully to ${targetDirectory}`);
     } catch (error: any) {
-        logger.error(`Failed to clone repo ${repo}: ${error.message}`);
-        throw error;
+		handleError(logger, "Failed to clone repo", error);
     }
 }
 
@@ -46,8 +46,7 @@ export async function checkoutBranch(logger: winston.Logger, git: SimpleGit, bra
         await git.pull('origin', branch);
         logger.info(`Checked out and pulled branch ${branch}`);
     } catch (error: any) {
-        logger.error(`Failed to checkout or pull branch ${branch}: ${error.message}`);
-        throw error;
+		handleError(logger, `Failed to checkout or pull branch ${branch}`, error);
     }
 }
 
@@ -61,7 +60,7 @@ export async function updateRemote(logger: winston.Logger, git: SimpleGit, branc
         const originRemote = remotes.find(remote => remote.name === 'origin');
 
         if (!originRemote || !originRemote.refs.fetch.startsWith('git@github.com:')) {
-            throw new Error(`Origin remote is missing or not using SSH. Found: ${originRemote?.refs.fetch}`);
+			handleError(logger, `Origin remote is missing or not using SSH. Found: ${originRemote?.refs.fetch}`, undefined);
         }
 
         await git.add(items);
@@ -74,11 +73,10 @@ export async function updateRemote(logger: winston.Logger, git: SimpleGit, branc
             await git.push('origin', branch);
             logger.info('Changes committed and pushed successfully');
         } else {
-            logger.error(`No changes to commit to the ${branch} branch`);
+            logger.warn(`No changes to commit to the ${branch} branch`);
         }
     } catch (error: any) {
-        logger.error(`Failed to commit and push changes: ${error.message}`);
-        throw error;
+		handleError(logger, `Failed to commit and push changes to the ${branch} branch`, error);
     }
 }
 
@@ -123,8 +121,7 @@ export async function getChangedFiles(logger: winston.Logger, git: SimpleGit, co
                 };
             });
     } catch (error) {
-        logger.error(`Error getting PR changed files: ${error}`);
-        throw error;
+		throw handleError(logger, `Failed to get changed files between ${baseBranch} and ${headBranch}`, error);
     }
 }
 
@@ -166,26 +163,21 @@ export async function postPRReview(logger: winston.Logger, context: Context<'pul
         // Log the review ID
         logger.info(`Successfully posted comment with ID ${review.data.id}`);
     } catch (error: any) {
-        logger.error(`Error posting comment: ${error}`);
-
-        // Log the specific error details
-        if (error instanceof Error) {
-            logger.error(`Error message: ${error.message}`);
-            logger.error(`Error stack: ${error.stack}`);
-        }
+        handleError(logger, `Failed to post comment on PR ${prNumber}`, error);
     }
 }
 
 // Helper function to hide previous bot comments
-// A problem with this code is that when it hides a comment via graphql, it marks them with the classifier OUTDATED
-// There's no way to do this via the Github API, so we have to use GraphQL`
-// The problem with this is that the classifier is not visible in the API, so we can't check if a comment is already hidden
+// A problem with this code is that when it hides a comment via GraphQL, it marks them with the classifier OUTDATED
+// There's no way to do this via the Github API, so we have to use GraphQL
+// The problem with this is that the classifier is NOT visible in the API, so we can't check if a comment is already hidden
+// It's also not visible in the GraphQL request, so there's no way to check if a comment is already hidden
 // This means that the code will hide all bot comments, even if they are already hidden
 // To *solve* this problem, the code skips hiding the latest comments since these have already been hidden in a previous run
-// This is done via the let count which is incremented for each hidden comment
-// The code will only hide the first 10 comments, which is a workaround to prevent hiding all comments
+// This is done via the `let count` which is incremented for each hidden comment
+// The code will only hide the first 8 comments, which is a workaround to prevent hiding all comments again
 // The comments are sorted by creation time in ascending order
-// 10 is an arbitrary number, but it should be enough to prevent hiding all comments
+// 8 is an arbitrary number, but it should be enough to prevent hiding all comments
 // The real solution would be to use the API to check if a comment is already hidden, but this is not possible
 // This is a workaround, not a solution
 export async function hideBotComments(logger: winston.Logger, context: Context<'pull_request'>, repoOwner: string, repoName: string, prNumber: number) {
@@ -197,7 +189,7 @@ export async function hideBotComments(logger: winston.Logger, context: Context<'
 				owner: repoOwner,
 				repo: repoName,
 				pull_number: prNumber,
-				per_page: 100,              // Fetch up to 100 reviews per page
+				per_page: 100,
 			}
 		);
 
@@ -239,12 +231,6 @@ export async function hideBotComments(logger: winston.Logger, context: Context<'
 			count++;
         }
     } catch (error: any) {
-        logger.error(`Error hiding previous bot comments: ${error}`);
-
-        // Log the specific error details
-        if (error instanceof Error) {
-            logger.error(`Error message: ${error.message}`);
-            logger.error(`Error stack: ${error.stack}`);
-        }
+		handleError(logger, `Failed to hide bot comments on PR ${prNumber}`, error);
     }
 }

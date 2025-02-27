@@ -3,6 +3,7 @@ import * as fs from "fs";
 import winston from "winston";
 import { Probot } from "probot";
 import { SimpleGit } from "simple-git";
+import { handleError } from "./globalHelpers.js";
 
 
 // Helper function to delete a folder recursively
@@ -52,8 +53,7 @@ export function clearTempStorage(app: Probot, logger: winston.Logger, contentRoo
         fs.mkdirSync(datasetDir, { recursive: true });
         logger.info(`Created ${datasetDir}`);
     } catch (error: any) {
-        logger.error(`Failed to remove temp folders: ${error.message}`);
-        throw error;
+		handleError(logger, `Failed to remove temp folders: ${error.message}`, error);
     }
 }
 
@@ -82,8 +82,7 @@ export async function copySpecificFiles(logger: winston.Logger, files: string[],
             logger.info(`Copied ${file} to ${destinationPath}`);
         }
     } catch (error: any) {
-        logger.error(`Failed to copy files: ${error.message}`);
-        throw error;
+        handleError(logger, `Failed to copy files: ${error.message}`, error);
     }
 }
 
@@ -107,8 +106,7 @@ export async function copyFolder(logger: winston.Logger, srcDir: string, destDir
             }
         });
     } catch (error: any) {
-        logger.error(`Failed to copy folder: ${error.message}`);
-        throw error;
+        handleError(logger, `Failed to copy folder: ${error.message}`, error);
     }
 }
 
@@ -126,8 +124,7 @@ export async function deleteBuildFolder(app: Probot, logger: winston.Logger, git
             logger.warn(`Build directory ${resolvedContentBuildDir} does not exist!`);
         }
     } catch (error: any) {
-        logger.error(`Failed to remove the build directory from the staging branch: ${error.message}`);
-        throw error;
+        handleError(logger, `Failed to remove the build directory from the staging branch: ${error.message}`, error);
     }
 }
 
@@ -148,7 +145,6 @@ export async function deleteReports(logger: winston.Logger, git: SimpleGit, file
             }
         }
     } catch (error: any) {
-        logger.error(`Failed to remove the reports from the staging branch: ${error.message}`);
-        throw error;
+        handleError(logger, `Failed to remove the reports from the staging branch: ${error.message}`, error);
     }
 }

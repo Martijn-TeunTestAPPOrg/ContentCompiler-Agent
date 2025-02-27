@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { SimpleGit } from "simple-git";
 import { Probot, Context } from "probot";
 import { createCustomLogger } from "../logger.js";
-import { config, getPayloadInfo, compileContent } from "../helpers/globalHelpers.js";
+import { config, handleError, getPayloadInfo, compileContent } from "../helpers/globalHelpers.js";
 import { clearTempStorage, deleteFolderRecursive, copySpecificFiles, copyFolder } from "../helpers/storageHelpers.js";
 import { resetGitConfig, cloneRepo, configureGit, checkoutBranch, getChangedFiles, checkIllegalChanges, postPRReview, hideBotComments } from "../helpers/gitHelpers.js";
 
@@ -74,8 +74,7 @@ export const preCompile = async (app: Probot, context: Context<'pull_request'>, 
 		logger.info('Removing the cloned repository...');
 		await deleteFolderRecursive(app, logger, config.contentRootDir);
 	} catch (error) {
-		logger.error(`Error deleting cloned repository: ${error}`);
-		throw error;
+		handleError(logger, 'Failed to remove cloned repository', error);
 	}
 
 	// Step 12: Move the temp storage folder to the cloned repo folder

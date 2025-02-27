@@ -21,6 +21,17 @@ export const config = {
     preCompileCommand: process.env.PRE_COMPILE_COMMAND || 'python src/scripts/compileContent.py --skip-link-check',
 };
 
+// Function to handle errors
+export function handleError(logger: winston.Logger, customMessage: string, error: any) {
+    logger.error(customMessage);
+
+    if (error instanceof Error) {
+        logger.error(`Error message: ${error.message}`);
+    }
+    logger.error(`Error stack: ${error.stack}`);
+    throw error;
+}
+
 // Helper function to check if the commit is from our app
 export function isAppCommit(context: Context<'push'>) {
     const sender = context.payload.sender;
