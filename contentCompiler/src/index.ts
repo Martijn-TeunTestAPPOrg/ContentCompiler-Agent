@@ -1,9 +1,11 @@
 import { Probot } from "probot";
 import { simpleGit } from "simple-git";
-import { preCompile } from "./preCompile.js";
-import { mainCompile } from "./mainCompile.js";
-import { isAppCommit } from "./helpers.js";
+import { preCompile } from "./compilers/preCompile.js";
+import { mainCompile } from "./compilers/mainCompile.js";
+import { isAppCommit } from "./helpers/globalHelpers.js";
 
+
+// Initialize the git instance
 const git = simpleGit().env({
 	GIT_SSH_COMMAND: 'ssh -i /root/.ssh/id_rsa -o UserKnownHostsFile=/root/.ssh/known_hosts'
 });

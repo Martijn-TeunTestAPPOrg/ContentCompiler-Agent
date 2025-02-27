@@ -24,6 +24,12 @@ COPY /src/scripts/requirements.txt ./
 RUN python3 -m venv venv
 RUN . venv/bin/activate && pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of the app
 COPY . .
 RUN npm run build
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Start the app
 CMD ["sh", "-c", ". venv/bin/activate && npm start | node_modules/.bin/pino-pretty --ignore=req"]
