@@ -175,7 +175,7 @@ export async function postPRReview(logger: winston.Logger, context: Context<'pul
 // This means that the code will hide all bot comments, even if they are already hidden
 // To *solve* this problem, the code skips hiding the latest comments since these have already been hidden in a previous run
 // This is done via the `let count` which is incremented for each hidden comment
-// The code will only hide the first 8 comments, which is a workaround to prevent hiding all comments again
+// The code will only hide the first 6 comments, which is a workaround to prevent hiding all comments again
 // The comments are sorted by creation time in ascending order
 // 8 is an arbitrary number, but it should be enough to prevent hiding all comments
 // The real solution would be to use the API to check if a comment is already hidden, but this is not possible
@@ -209,8 +209,8 @@ export async function hideBotComments(logger: winston.Logger, context: Context<'
 		// Hide all bot comments except the most recent one if it was posted in this run
 		let count = 0;
 		for (const review of botReviews) {
-			if (count >= 8) {
-				logger.info(`Hid 8 bot comments, stopping...`);
+			if (count >= 6) {
+				logger.info(`Hid 6 bot comments, stopping...`);
 				break;
 			}
 

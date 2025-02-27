@@ -1,6 +1,7 @@
 import { SimpleGit } from "simple-git";
 import { Probot, Context } from "probot";
 import { createCustomLogger } from "../logger.js";
+import { uploadLogToR2 } from "../helpers/r2Helper.js";
 import { config, getPayloadInfo, compileContent } from "../helpers/globalHelpers.js";
 import { resetGitConfig, cloneRepo, configureGit, checkoutBranch, updateRemote } from "../helpers/gitHelpers.js";
 import { clearTempStorage, deleteFolderRecursive, copySpecificFiles, copyFolder, deleteBuildFolder, deleteReports } from "../helpers/storageHelpers.js";
@@ -8,7 +9,7 @@ import { clearTempStorage, deleteFolderRecursive, copySpecificFiles, copyFolder,
 
 export const mainCompile = async (app: Probot, context: Context<'push'>, git: SimpleGit) => {
     const startTime = Date.now();
-    const logger = createCustomLogger('mainCompile');
+    const { logger, logFilePath } = createCustomLogger('mainCompile');
 
     const { repoOwner, repoName, user } = getPayloadInfo(context);
     logger.info(`Push event received for ${repoOwner}/${repoName}`);
@@ -71,4 +72,7 @@ export const mainCompile = async (app: Probot, context: Context<'push'>, git: Si
     logger.info('Content compilation completed successfully!');
     const endTime = Date.now();
     logger.info(`Execution time: ${(endTime - startTime) / 1000 }s`);
+
+    // Upload logs to R2
+    await uploadLogToR2(logger, logFilePath);
 }

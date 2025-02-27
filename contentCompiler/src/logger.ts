@@ -1,14 +1,16 @@
 import winston, { format } from "winston";
 const { combine, timestamp, label, printf } = format;
 
+// Custom log format
 const customFormat = printf(({ level, message, label, timestamp }) => {
     return `${timestamp} [${label}] ${level}: ${message}`;
 });
 
+// Create a custom logger
 export function createCustomLogger(customLabel: string) {
-    const logFilePath = `logs/${customLabel}-${new Date().toISOString()}.log`;
+    const logFilePath = `logs/${customLabel}-${new Date().toISOString().replace(":", "-")}.log`;
 
-    return winston.createLogger({
+    const logger = winston.createLogger({
         level: "info",
         format: combine(
             label({ label: customLabel }),      // Add a label to the logs
@@ -20,4 +22,6 @@ export function createCustomLogger(customLabel: string) {
             new winston.transports.Console(),
         ],
     });
+
+    return { logger, logFilePath };
 }
