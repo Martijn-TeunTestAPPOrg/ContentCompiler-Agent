@@ -8,6 +8,19 @@ This repository contains a GitHub App built with Probot that automates the proce
 - **Validation**: Ensures that only allowed files are changed and checks for unmerged files in pull requests.
 - **Reporting**: Generates and commits reports to the repository.
 
+## Manual compile
+Download the dataset and place it in `src/storage/dataset`
+The filename should be `dataset.xlsx`
+
+Copy the md source content in `src/storage/content_repo`
+^ also copy the content folder so the index.md should be in: `src/storage/content_repo/content/index.md`
+
+Open a new terminal
+1. `cd contentCompiler`
+2. Run `python src/scripts/compileContent.py`
+
+Copy the compiled build folders and push them to staging and main
+
 ## **Getting Started**
 ### **Prerequisites**
 - Node.js
