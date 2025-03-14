@@ -69,7 +69,7 @@ contentCompiler/src/storage/content_repo/content/
 contentCompiler/
 ```
 
-6. Run the command:
+6. To compile the contenten run the command:
 ```bash
 python .\src\scripts\compileContent.py
 ```
@@ -79,7 +79,7 @@ python .\src\scripts\compileContent.py
 python .\src\scripts\compileContent.py --skip-link-check  # Skip dynamic link validation
 ```
 
-7. Go to the folder
+7. The output will be in the folder
 ```
 contentCompiler/src/storage/content_repo/build/
 ```
