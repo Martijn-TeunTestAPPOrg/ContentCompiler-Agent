@@ -9,16 +9,7 @@ The Content Compiler is a Python script that processes and validates markdown co
 4. **Dynamic Link Validation**: Validates and updates dynamic links in content
 5. **Report Generation**: Generates detailed reports on content status and taxonomy implementation
 
-## Installation
-
-### Prerequisites
-- Python 3.x
-- Required packages:
-  ```bash
-  pip install pandas openpyxl
-  ```
-
-### Project Structure
+## Project Structure
 ```
 contentCompiler/
 ├── src/
@@ -31,16 +22,47 @@ contentCompiler/
 │   └── content/                  # Source content directory
 ```
 
-## Usage
-
-### Basic Usage
+## Prerequisites
+- Python 3.x
+- PIP
+- Required packages:
 ```bash
-python compileContent.py
+pip install pandas openpyxl
 ```
 
-### Options
+## Usage
+1. Place in the dataset in the folder:
+```
+contentCompiler/src/storage/dataset/
+```
+So the final location of the dataset will be:
+```
+contentCompiler/src/storage/dataset/dataset.xlsx
+```
+
+2. Clone the content repo and place the source content in the folder:
+```
+contentCompiler/src/storage/content_repo/
+```
+
+So the final content will be in:
+```
+contentCompiler/src/storage/content_repo/content/
+```
+
+3. Open a terminal and go the folder:
+```
+contentCompiler/
+```
+
+4. Run the command:
 ```bash
-python compileContent.py --skip-link-check  # Skip dynamic link validation
+python .\src\scripts\compileContent.py
+```
+
+**Options**
+```bash
+python .\src\scripts\compileContent.py --skip-link-check  # Skip dynamic link validation
 ```
 
 ## Configuration
@@ -55,7 +77,6 @@ CONTENT_REPORT_PATH = "content_report.md"    # Content report output
 ```
 
 ## Features
-
 ### 1. Taxonomy Validation
 - Validates taxonomy codes against dataset
 - Format: `{tc1}.{tc2}.{tc3}.{type}`
@@ -133,17 +154,6 @@ The script requires the following Python packages:
 - `shutil`: For file operations such as copying and removing directories.
 - `argparse`: For parsing command-line arguments.
 - `pathlib`: For handling filesystem paths in an object-oriented way.
-
-## Usage
-To run the script, use the following command:
-```sh
-python compileContent.py
-```
-
-You can also skip the dynamic link validation by adding the --skip-link-check flag:
-```sh
-python compileContent.py --skip-link-check
-```
 
 ##  `config.py`
 This is the config file which stores the different config options.
