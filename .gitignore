@@ -26,8 +26,8 @@ dist-ssr
 **/DS_Store
 **/content_repo
 **/__pycache__
-/contentCompiler/src/temp_storage
+/CompilerInterface/src/temp_storage
 **/.obsidian
-/contentCompiler/src/dataset
-/contentCompiler/src/storage
-/contentCompiler/.ssh
+/CompilerInterface/src/dataset
+/CompilerInterface/src/storage
+/CompilerInterface/.ssh
