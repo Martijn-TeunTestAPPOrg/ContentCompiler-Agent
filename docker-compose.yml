@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  content-compiler:
+    build:
+      context: ./contentCompiler/
+      dockerfile: ./Dockerfile
+    environment:
+      - GIT_SSH_COMMAND=ssh -i /root/.ssh/id_rsa -o UserKnownHostsFile=/root/.ssh/known_hosts
+    develop:
+      watch:
+        - action: rebuild
+          path: ./contentCompiler/

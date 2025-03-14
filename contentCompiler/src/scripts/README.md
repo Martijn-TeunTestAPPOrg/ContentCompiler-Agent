@@ -9,16 +9,7 @@ The Content Compiler is a Python script that processes and validates markdown co
 4. **Dynamic Link Validation**: Validates and updates dynamic links in content
 5. **Report Generation**: Generates detailed reports on content status and taxonomy implementation
 
-## Installation
-
-### Prerequisites
-- Python 3.x
-- Required packages:
-  ```bash
-  pip install pandas openpyxl
-  ```
-
-### Project Structure
+## Project Structure
 ```
 contentCompiler/
 ├── src/
@@ -31,31 +22,61 @@ contentCompiler/
 │   └── content/                  # Source content directory
 ```
 
-## Usage
-
-### Basic Usage
+## Prerequisites
+- Python 3.x
+- PIP
+- Required packages:
 ```bash
-python compileContent.py
+pip install pandas openpyxl
 ```
 
-### Options
+## Usage
+1. Place in the dataset in the folder:
+```
+contentCompiler/src/storage/dataset/
+```
+So the final location of the dataset will be:
+```
+contentCompiler/src/storage/dataset/dataset.xlsx
+```
+
+2. Clone the content repo and place the source content in the folder:
+```
+contentCompiler/src/storage/content_repo/
+```
+
+So the final content will be in:
+```
+contentCompiler/src/storage/content_repo/content/
+```
+
+3. Open a terminal and go the folder:
+```
+contentCompiler/
+```
+
+4. Run the command:
 ```bash
-python compileContent.py --skip-link-check  # Skip dynamic link validation
+python .\src\scripts\compileContent.py
+```
+
+**Options**
+```bash
+python .\src\scripts\compileContent.py --skip-link-check  # Skip dynamic link validation
 ```
 
 ## Configuration
 Key configuration settings in `config.py`:
 
 ```python
-SRC_DIR = "src/cloned_repo/content"          # Source content directory
-DEST_DIR = "src/cloned_repo/build"           # Build output directory
+SRC_DIR = "src/content_repo/content"          # Source content directory
+DEST_DIR = "src/content_repo/build"           # Build output directory
 DATASET = "src/dataset.xlsx"                 # Taxonomy dataset file
 TAXCO_REPORT_PATH = "taxco_report.md"        # Taxonomy report output
 CONTENT_REPORT_PATH = "content_report.md"    # Content report output
 ```
 
 ## Features
-
 ### 1. Taxonomy Validation
 - Validates taxonomy codes against dataset
 - Format: `{tc1}.{tc2}.{tc3}.{type}`
@@ -134,25 +155,14 @@ The script requires the following Python packages:
 - `argparse`: For parsing command-line arguments.
 - `pathlib`: For handling filesystem paths in an object-oriented way.
 
-## Usage
-To run the script, use the following command:
-```sh
-python compileContent.py
-```
-
-You can also skip the dynamic link validation by adding the --skip-link-check flag:
-```sh
-python compileContent.py --skip-link-check
-```
-
 ##  `config.py`
 This is the config file which stores the different config options.
 It's also used to save the state of the reports.
-- Source Directory: src/cloned_repo/content
-- Destination Directory: src/cloned_repo/build
+- Source Directory: src/content_repo/content
+- Destination Directory: src/content_repo/build
 - Dataset File: src/datasets/dataset.xlsx
-- Taxonomy Report Path: src/cloned_repo/taxco_report.md
-- Content Report Path: src/cloned_repo/content_report.md
+- Taxonomy Report Path: src/content_repo/taxco_report.md
+- Content Report Path: src/content_repo/content_report.md
 
 ## Report structure
 The script produces two md reports.
