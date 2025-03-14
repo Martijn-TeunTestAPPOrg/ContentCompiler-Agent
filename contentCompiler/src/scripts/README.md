@@ -27,6 +27,11 @@ contentCompiler/
 - PIP
 - Required packages:
 ```bash
+pip install requirements.txt
+```
+
+Or 
+```
 pip install pandas openpyxl
 ```
 
