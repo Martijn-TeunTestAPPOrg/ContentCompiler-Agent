@@ -27,7 +27,7 @@ contentCompiler/
 - PIP
 - Required packages:
 ```bash
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 Or 
@@ -36,7 +36,16 @@ pip install pandas openpyxl
 ```
 
 ## Usage
-1. Place in the dataset in the folder:
+1. Make sure the following folders exist:
+```
+contentCompiler/src/storage/
+contentCompiler/src/storage/dataset/
+contentCompiler/src/storage/content_repo/
+```
+
+2. Download the `dataset.xlsx` from: https://github.com/Windesheim-HBO-ICT/Leerlijn-Content-SE-Dataset
+
+4. Place the dataset in the folder:
 ```
 contentCompiler/src/storage/dataset/
 ```
@@ -45,7 +54,7 @@ So the final location of the dataset will be:
 contentCompiler/src/storage/dataset/dataset.xlsx
 ```
 
-2. Clone the content repo and place the source content in the folder:
+4. Clone the content repo and place the source content in the folder:
 ```
 contentCompiler/src/storage/content_repo/
 ```
@@ -55,12 +64,12 @@ So the final content will be in:
 contentCompiler/src/storage/content_repo/content/
 ```
 
-3. Open a terminal and go the folder:
+5. Open a terminal and go the folder:
 ```
 contentCompiler/
 ```
 
-4. Run the command:
+6. Run the command:
 ```bash
 python .\src\scripts\compileContent.py
 ```
@@ -68,6 +77,11 @@ python .\src\scripts\compileContent.py
 **Options**
 ```bash
 python .\src\scripts\compileContent.py --skip-link-check  # Skip dynamic link validation
+```
+
+7. Go to the folder
+```
+contentCompiler/src/storage/content_repo/build/
 ```
 
 ## Configuration
