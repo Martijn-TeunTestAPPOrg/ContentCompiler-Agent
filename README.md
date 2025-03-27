@@ -1,6 +1,7 @@
 # Content Compiler GitHub App
 This repository contains a GitHub App built with Probot that automates the process of compiling and validating Markdown files based on taxonomy codes. 
 The app listens to specific GitHub events and triggers pre-compilation and main compilation processes accordingly.
+The content is compiled with a Python script. This script is pulled from a separate repository to make development en deployment easier.
 
 ## Features
 - **Pre-Compile**: Triggered on pull request events (`opened`, `reopened`, `synchronize`) targeting the `content` branch.
@@ -27,6 +28,31 @@ The main compile process is triggered by push events to the content branch. It p
 3. Compiles the content.
 4. Commits and pushes the report to the `content` branch
 5. Commits and pushes the compiled files and reports to the `staging` branch.
+
+## Deployment on Linux
+Run the following commands to install the necessary OS dependencies
+
+```
+# Download unzip
+sudo apt-get install zip unzip
+
+# Download and install fnm:
+curl -o- https://fnm.vercel.app/install | bash
+
+# Download and install Node.js:
+fnm install 22
+
+# Verify the Node.js version:
+node -v # Should print "v22.14.0".
+
+# Verify npm version:
+npm -v # Should print "10.9.2".
+```
+
+Clone the repository
+```
+git clone https://github.com/Martijn-TeunTestAPPOrg/ContentCompiler-Agent.git
+```
 
 ## Running with Docker
 > The python compiler requires a couple of additional packages. These packages are in `requirements.txt`.
@@ -64,7 +90,7 @@ Some of these variables are already filled in `.env.example`
 - `PRE_COMPILE_COMMAND=`                            // Command which is used to activate the Python preCompile
 
 ### GitHub User Configuration for Bot Authentication
-### 1. Generate an SSH Key
+#### 1. Generate an SSH Key
 Run the following command to create a new SSH key:  
 ```sh
 ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
@@ -72,17 +98,17 @@ ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
 1.1 **Name the key**: `id_rsa_github_bot`  
 1.2 **Leave the passphrase empty** when prompted  
 
-### 2. Add the SSH Key to GitHub 
+#### 2. Add the SSH Key to GitHub 
 Go to **GitHub.com → Settings → SSH and GPG keys → New SSH Key**, then:  
 - **Title**: `BotAuth`  
 - **Key Type**: `Authentication`  
 - **Key**: Copy & paste the contents of `id_rsa_github_bot.pub`  
 
-### 3. Move the Key to the Correct Location
+#### 3. Move the Key to the Correct Location
 Move both the private (`id_rsa_github_bot`) and public (`id_rsa_github_bot.pub`) keys to the `.ssh` folder in the root of `CompilerInterface`:  
 So in: `CompilerInterface/.ssh/`
 
-### _Local testing_
+#### _Local testing_
 Run:
 ```sh
 mv id_rsa_github_bot* ~/.ssh/
@@ -102,9 +128,10 @@ If this fails, run to make a new SSH key:
 ssh -i ~/.ssh/id_rsa_github_bot -T git@github.com
 ```
 
-### 5. Start the container
+#### 5. Start the container
 Run the following command in the root of the project
 ```
+docker compose build
 docker compose up
 ```
 

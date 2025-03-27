@@ -92,23 +92,41 @@ export async function getChangedFiles(logger: winston.Logger, git: SimpleGit, co
         // Get the diff between base and head
         const diff = await git.cwd(contentRootDir)
             .diff([`origin/${baseBranch}...origin/${headBranch}`, '--name-status']);
-        
+
+        // Helper function to clean a git file path: remove surrounding quotes,
+        // decode octal escapes, and convert from latin1 to UTF-8.
+        const cleanGitPath = (path: string): string => {
+            // Remove surrounding quotes if present
+            if (path.startsWith('"') && path.endsWith('"')) {
+                path = path.slice(1, -1);
+            }
+            // Replace octal escapes (e.g. \303\253) with the corresponding bytes
+            const replaced = path.replace(/\\([0-7]{3})/g, (_, octal) =>
+                String.fromCharCode(parseInt(octal, 8))
+            );
+            // Convert the resulting string from latin1 to utf8
+            return Buffer.from(replaced, 'latin1').toString('utf8');
+        };
+
         // Parse the diff output into a more useful format
         return diff.split('\n')
             .filter(line => line.trim().length > 0)
             .map(line => {
-                const [status, oldFilename, filename] = line.split('\t');
+                const parts = line.split('\t');
+                const status = parts[0];
+                const oldFilename = cleanGitPath(parts[1] || '');
+                const newFilename = parts.length >= 3 ? cleanGitPath(parts[2]) : oldFilename;
                 
                 // Handle renamed files (they have old and new names)
                 if (status === 'R' || status.startsWith('R')) {
                     return {
-                        filename,  // new name
+                        filename: newFilename,  // new name
                         oldFilename,  // old name
                         status: 'renamed'
                     };
                 }
-
-                // Handle added, modified, deleted, copied, unmerged, type_changed
+                
+                // For other statuses, use the cleaned filename
                 return {
                     filename: oldFilename,
                     status: status === 'A' ? 'added' :           // Added
@@ -121,7 +139,7 @@ export async function getChangedFiles(logger: winston.Logger, git: SimpleGit, co
                 };
             });
     } catch (error) {
-		throw handleError(logger, `Failed to get changed files between ${baseBranch} and ${headBranch}`, error);
+        throw handleError(logger, `Failed to get changed files between ${baseBranch} and ${headBranch}`, error);
     }
 }
 
@@ -131,6 +149,11 @@ export async function checkIllegalChanges(logger: winston.Logger, prNumber: numb
 
     // Get the report files from the environment
     const reportFiles = process.env.REPORT_FILES?.split(',') || [];
+
+    // Log the files which are changed
+    for (const file of changedFiles) {
+        logger.info(`File: ${file.filename} (${file.status})`);
+    }
 
     // Filter out files that are not in the content directory or are in the report files
     // No changes outside the content directory are allowed and the report files are not allowed in content
