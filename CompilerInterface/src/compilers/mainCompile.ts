@@ -23,6 +23,10 @@ export const mainCompile = async (app: Probot, context: Context<'push'>, git: Si
 
     // Step 3: Clone the compiler
 	await cloneRepo(app, logger, git, config.compilerRepoUrl, config.compilerDir);
+    await git.cwd("src/storage/content_compiler/");
+    await checkoutBranch(logger, git, "dev");
+
+    await resetGitConfig(git);
 
     // Step 4: Clone the dataset
     await cloneRepo(app, logger, git, config.datasetRepoUrl, config.datasetDir);
